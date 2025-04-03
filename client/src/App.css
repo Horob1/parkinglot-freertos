@@ -1,0 +1,19 @@
+input[type="date"] {
+  position: relative;
+  padding-right: 2.5rem; /* Tạo khoảng trống để icon không đè lên chữ */
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  right: 8px; /* Căn chỉnh về bên phải */
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  opacity: 0.7; /* Giảm độ trong suốt nếu cần */
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1; /* Khi hover, làm icon rõ hơn */
+}
