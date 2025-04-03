@@ -20,7 +20,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 theApp(app);
 db();
-app.use(express.static(path.join(__dirname, 'fe')));
+app.use(express.static(path.join(__dirname, '../client/dist')));
 routes(app);
 
 httpServer.listen(env.PORT, () => {
