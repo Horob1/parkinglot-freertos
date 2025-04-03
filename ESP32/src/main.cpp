@@ -64,8 +64,8 @@ void clearLCD(TimerHandle_t xTimer)
   lcd.clear(); // Xóa màn hình LCD
 }
 
-const String WS_SERVER = "192.168.1.15";
-const int WS_PORT = 3000;
+const String WS_SERVER = "192.168.1.3";
+const int WS_PORT = 3600;
 
 WiFiMulti WiFiMulti;
 WebSocketsClient webSocket;
@@ -324,7 +324,7 @@ void ServoInTask(void *pvParameters)
   while (true)
   {
     esp_task_wdt_reset();
-    if (xSemaphoreTake(bs_in, portMAX_DELAY) == pdTRUE && digitalRead(IR_IN) == LOW)
+    if (xSemaphoreTake(bs_in, pdMS_TO_TICKS(2000)) == pdTRUE && digitalRead(IR_IN) == LOW)
     {
       servo1.write(180);
       while (digitalRead(IR_IN) == LOW)
@@ -345,7 +345,7 @@ void ServoOutTask(void *pvParameters)
   while (true)
   {
     esp_task_wdt_reset();
-    if (xSemaphoreTake(bs_out, portMAX_DELAY) == pdTRUE && digitalRead(IR_OUT) == LOW)
+    if (xSemaphoreTake(bs_out, pdMS_TO_TICKS(2000)) == pdTRUE && digitalRead(IR_OUT) == LOW)
     {
       servo2.write(180);
       while (digitalRead(IR_OUT) == LOW)
@@ -392,12 +392,12 @@ void setup()
   xTaskCreatePinnedToCore(WiFiTask, "WiFiTask", 4096, NULL, 1, NULL, 0);
   xTaskCreatePinnedToCore(WebSocketTask, "WebSocketTask", 8192, NULL, 3, NULL, 0);
   xTaskCreatePinnedToCore(UpdateSlotTask, "UpdateSlotTask", 4096, NULL, 2, NULL, 0);
-  xTaskCreatePinnedToCore(RFIDInTask, "RFIDInTask", 4096, NULL, 4, NULL, 0);
-  xTaskCreatePinnedToCore(ServoInTask, "ServoInTask", 4096, NULL, 3, NULL, 0);
+  xTaskCreatePinnedToCore(RFIDInTask, "RFIDInTask", 4096, NULL, 3, NULL, 0);
+  xTaskCreatePinnedToCore(ServoInTask, "ServoInTask", 4096, NULL, 2, NULL, 0);
 
   // Core 1
-  xTaskCreatePinnedToCore(RFIDOutTask, "RFIDOutTask", 4096, NULL, 4, NULL, 1);
-  xTaskCreatePinnedToCore(ServoOutTask, "ServoOutTask", 4096, NULL, 3, NULL, 1);
+  xTaskCreatePinnedToCore(RFIDOutTask, "RFIDOutTask", 4096, NULL, 3, NULL, 1);
+  xTaskCreatePinnedToCore(ServoOutTask, "ServoOutTask", 4096, NULL, 2, NULL, 1);
 
   // ISR
   pinMode(BTN_IN, INPUT_PULLUP);

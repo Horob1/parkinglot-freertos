@@ -9,10 +9,23 @@ import {
 import { ModeToggle } from "../ModeToggle";
 import { useEffect, useState } from "react";
 import { LayoutContext } from "@/hooks/use-layout";
+import axiosInstance from "@/lib/axios";
 
 export const MainLayout = () => {
-  const { auth } = authStore();
+  const { auth, logout } = authStore();
   const [contentHeight, setContentHeight] = useState(0);
+
+  useEffect(() => {
+    const getMe = async () => {
+      try {
+        await axiosInstance.get("/user/me");
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (error) {
+        logout();
+      }
+    };
+    getMe();
+  }, [logout]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -43,9 +56,7 @@ export const MainLayout = () => {
             <div className="flex-1" />
             <ModeToggle />
           </header>
-          <div
-            className="flex-1 p-2"
-          >
+          <div className="flex-1 p-2">
             <Outlet></Outlet>
           </div>
         </SidebarInset>

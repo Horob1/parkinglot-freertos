@@ -1554,11 +1554,6 @@
   resolved "https://registry.npmjs.org/@types/http-errors/-/http-errors-2.0.4.tgz"
   integrity sha512-D0CFMMtydbJAegzOyHjtiKPLlvnm3iTZyZRSZoLq2mRhDdmLfIWOCYPfQJ4cu2erKghU++QvjcUjp/5h7hESpA==
 
-"@types/i18n@^0.13.5":
-  version "0.13.12"
-  resolved "https://registry.npmjs.org/@types/i18n/-/i18n-0.13.12.tgz"
-  integrity sha512-iAd2QjKh+0ToBXocmCS3m38GskiaGzmSV1MTQz2GaOraqSqBiLf46J7u3EGINl+st+Uk4lO3OL7QyIjTJlrWIg==
-
 "@types/istanbul-lib-coverage@*", "@types/istanbul-lib-coverage@^2.0.0", "@types/istanbul-lib-coverage@^2.0.1":
   version "2.0.6"
   resolved "https://registry.npmjs.org/@types/istanbul-lib-coverage/-/istanbul-lib-coverage-2.0.6.tgz"
