@@ -11,6 +11,7 @@ import path from 'path';
 dotenv.config();
 
 const app: Express = express();
+app.use(express.static(path.join(__dirname, '../client/dist')));
 const httpServer = createServer(app);
 initSocket(httpServer);
 const corsOptions = {
@@ -20,7 +21,6 @@ const corsOptions = {
 app.use(cors(corsOptions));
 theApp(app);
 db();
-app.use(express.static(path.join(__dirname, '../client/dist')));
 routes(app);
 
 httpServer.listen(env.PORT, () => {

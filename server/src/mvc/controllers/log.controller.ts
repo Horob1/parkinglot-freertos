@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { LogModel } from '../models/log.model';
+import { CardModel } from '../models/card.model';
 
 export const getLog = async (req: Request, res: Response) => {
   try {
@@ -42,6 +43,30 @@ export const getLog = async (req: Request, res: Response) => {
       message: 'Logs retrieved and analyzed successfully',
       logs,
     });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Error during login',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+};
+
+export const checkLog = async (req: Request, res: Response) => {
+  try {
+    const { uid } = req.body;
+
+    if (!uid) {
+      return res.status(400).json({ message: 'Missing required parameters' });
+    }
+
+    const card = await CardModel.findOne({ uid });
+    if (!card) {
+      return res.status(404).json({ message: 'Card not found' });
+    }
+
+    const log = await LogModel.findOne({ cardId: card._id, isCheckout: false });
+
+    res.status(200).json(log);
   } catch (error) {
     res.status(500).json({
       message: 'Error during login',

@@ -6,6 +6,7 @@ import { LogModel } from '../mvc/models/log.model';
 
 export let wss: WebSocketServer;
 const clients = new Map<string, WebSocket>();
+const appClients = new Set<WebSocket>();
 
 export const initSocket = (httpServer: Server) => {
   wss = new WebSocketServer({ server: httpServer, path: '/ws' });
@@ -16,6 +17,7 @@ export const initSocket = (httpServer: Server) => {
     ws.on('message', async message => {
       try {
         const data = JSON.parse(message.toString());
+        console.log(`[WebSocket]: Received message: ${message}`);
 
         switch (data.type) {
           case 'auth':
@@ -27,13 +29,16 @@ export const initSocket = (httpServer: Server) => {
                 const slots = await SlotModel.find();
                 admin.send(JSON.stringify({ type: 'update-slots', slots: slots }));
               }
+            }
+            if (data.clientType === 'app') {
+              appClients.add(ws);
             } else {
               console.log(`❌ [WebSocket]: Invalid client type`);
               ws.close();
             }
             break;
           case 'check-in':
-            if (data.clientType === 'esp') {
+            if (true) {
               const uid = data.uid.toUpperCase();
               const card = await CardModel.findOne({ uid });
               if (!card) {
@@ -52,9 +57,10 @@ export const initSocket = (httpServer: Server) => {
               console.log(`✅ [WebSocket]: Checked in card ${card.uid}`);
               ws.send(JSON.stringify({ type: 'check-in-success', message: 'Checked in successfully' }));
             }
+
             break;
           case 'check-out':
-            if (data.clientType === 'esp') {
+            if (true) {
               const uid = data.uid.toUpperCase();
               const card = await CardModel.findOne({ uid });
               if (!card) {
@@ -69,27 +75,31 @@ export const initSocket = (httpServer: Server) => {
                 return;
               }
               isExist.isCheckout = true;
-              const bill = (10000 * (new Date().getTime() - isExist.createdAt.getTime())) / 1000 / 60 / 60;
+              // Tính tiền nếu dưới 1 giờ thì 10000 vnđ/giờ
+              // Tính tiền nếu trên 1 giờ thì 20000 vnđ/giờ
+              const bill = Math.ceil((Date.now() - isExist.createdAt.getTime()) / 3600000) * 10000;
               isExist.bill = bill;
               await isExist.save();
               console.log(`✅ [WebSocket]: Checked out card ${card.uid}`);
               ws.send(JSON.stringify({ type: 'check-out-success', message: 'Checked out successfully', bill: bill.toString() }));
             }
+
             break;
           case 'update-slot':
-            if (data.clientType === 'esp') {
-              const admin = clients.get('admin');
-              const slot_1 = data.slot_1;
-              const slot_2 = data.slot_2;
-              await Promise.all([
-                SlotModel.findOneAndUpdate({ number: 1 }, { isEmpty: slot_1.isEmpty }, { new: true }),
-                SlotModel.findOneAndUpdate({ number: 2 }, { isEmpty: slot_2.isEmpty }, { new: true }),
-              ]);
-              if (admin) {
-                const slots = await SlotModel.find();
-                admin.send(JSON.stringify({ type: 'update-slots', slots: slots }));
-              }
+            const admin = clients.get('admin');
+            const slot_1 = data.slot_1.toString() === '1';
+            const slot_2 = data.slot_2.toString() === '1';
+            await Promise.all([
+              SlotModel.findOneAndUpdate({ number: 1 }, { isEmpty: slot_1 }, { new: true }),
+              SlotModel.findOneAndUpdate({ number: 2 }, { isEmpty: slot_2 }, { new: true }),
+            ]);
+            const slots = await SlotModel.find();
+            if (admin) {
+              admin.send(JSON.stringify({ type: 'update-slots', slots: slots }));
             }
+            appClients.forEach(client => {
+              client.send(JSON.stringify({ type: 'update-slots', slots: slots }));
+            });
             break;
           default:
             console.log(`❌ [WebSocket]: Unknown message type`);
@@ -101,13 +111,14 @@ export const initSocket = (httpServer: Server) => {
     });
 
     ws.on('close', () => {
+      console.log(`❌ [WebSocket]: Client disconnected`);
       for (const [key, client] of clients.entries()) {
         if (client === ws) {
           clients.delete(key);
-          console.log(`❌ [WebSocket]: ${key} disconnected`);
           break;
         }
       }
+      appClients.delete(ws);
     });
   });
 };
