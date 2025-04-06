@@ -40,7 +40,11 @@ android {
 }
 
 dependencies {
-
+    implementation(libs.gson)
+    implementation(libs.lottie.compose)
+    implementation(libs.retrofit)
+    implementation(libs.converter.gson)
+    implementation(libs.logging.interceptor)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

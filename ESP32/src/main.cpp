@@ -13,6 +13,7 @@
 #include "freertos/task.h"
 #include "freertos/timers.h"
 #include <ESP32Servo.h>
+#include <SPI.h>
 #define WDT_TIMEOUT 10 // Thời gian tối đa (giây) trước khi WDT reset ESP32
 
 Servo servo1;
@@ -21,11 +22,8 @@ Servo servo2;
 #define SERVO_1 26
 #define SERVO_2 27
 
-#define BTN_IN 16
-#define BTN_OUT 17
-
-#define IR_1 12
-#define IR_2 13
+#define IR_1 35
+#define IR_2 34
 #define IR_IN 14
 #define IR_OUT 15
 
@@ -72,20 +70,6 @@ WebSocketsClient webSocket;
 
 SemaphoreHandle_t bs_in;
 SemaphoreHandle_t bs_out;
-
-void IRAM_ATTR ISR_BTN_IN()
-{
-  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-  xSemaphoreGiveFromISR(bs_in, &xHigherPriorityTaskWoken);
-  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-}
-
-void IRAM_ATTR ISR_BTN_OUT()
-{
-  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-  xSemaphoreGiveFromISR(bs_out, &xHigherPriorityTaskWoken);
-  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-}
 
 void hexdump(const void *mem, uint32_t len, uint8_t cols = 16)
 {
@@ -174,6 +158,7 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
     break;
 
   case WStype_TEXT:
+    Serial.printf("[WebSocket] Received: %s\n", payload);
     handleServerResponse(reinterpret_cast<const char *>(payload)); // Xử lý phản hồi từ server
     break;
 
@@ -258,14 +243,17 @@ void WebSocketTask(void *pvParameters)
 void UpdateSlotTask(void *pvParameters)
 {
   esp_task_wdt_add(NULL);
+  int time = 0;
   int slot_1 = 0, slot_2 = 0;
   while (true)
   {
     esp_task_wdt_reset();
+    int newTime = millis();
     int newSlot_1 = digitalRead(IR_1);
     int newSlot_2 = digitalRead(IR_2);
-    if (slot_1 != newSlot_1 || slot_2 != newSlot_2)
+    if ((slot_1 != newSlot_1 || slot_2 != newSlot_2) && newTime - time > 1000)
     {
+      time = newTime;
       slot_1 = newSlot_1;
       slot_2 = newSlot_2;
       webSocket.sendTXT("{\"type\": \"update-slot\", \"slot_1\": " + String(slot_1) + ", \"slot_2\": " + String(slot_2) + "}");
@@ -277,13 +265,13 @@ void UpdateSlotTask(void *pvParameters)
 void RFIDInTask(void *pvParameters)
 {
   esp_task_wdt_add(NULL);
+  String uid = "";
   while (true)
   {
     esp_task_wdt_reset();
     if (rfidIn.PICC_IsNewCardPresent() && rfidIn.PICC_ReadCardSerial() && digitalRead(IR_IN) == LOW)
     {
-
-      String uid = "";
+      uid = "";
       for (byte i = 0; i < rfidIn.uid.size; i++)
       {
         uid += String(rfidIn.uid.uidByte[i], HEX);
@@ -299,13 +287,13 @@ void RFIDInTask(void *pvParameters)
 void RFIDOutTask(void *pvParameters)
 {
   esp_task_wdt_add(NULL);
+  String uid = "";
   while (true)
   {
     esp_task_wdt_reset();
     if (rfidOut.PICC_IsNewCardPresent() && rfidOut.PICC_ReadCardSerial() && digitalRead(IR_OUT) == LOW)
     {
-
-      String uid = "";
+      uid = "";
       for (byte i = 0; i < rfidOut.uid.size; i++)
       {
         uid += String(rfidOut.uid.uidByte[i], HEX);
@@ -326,14 +314,15 @@ void ServoInTask(void *pvParameters)
     esp_task_wdt_reset();
     if (xSemaphoreTake(bs_in, pdMS_TO_TICKS(2000)) == pdTRUE && digitalRead(IR_IN) == LOW)
     {
-      servo1.write(180);
+      servo1.write(90);
       while (digitalRead(IR_IN) == LOW)
       {
+        esp_task_wdt_reset();
         vTaskDelay(pdMS_TO_TICKS(100));
       }
       vTaskDelay(pdMS_TO_TICKS(1000));
 
-      servo1.write(0);
+      servo1.write(180);
     }
     vTaskDelay(pdMS_TO_TICKS(100));
   }
@@ -347,13 +336,14 @@ void ServoOutTask(void *pvParameters)
     esp_task_wdt_reset();
     if (xSemaphoreTake(bs_out, pdMS_TO_TICKS(2000)) == pdTRUE && digitalRead(IR_OUT) == LOW)
     {
-      servo2.write(180);
+      servo2.write(90);
       while (digitalRead(IR_OUT) == LOW)
       {
+        esp_task_wdt_reset();
         vTaskDelay(pdMS_TO_TICKS(100));
       }
       vTaskDelay(pdMS_TO_TICKS(1000));
-      servo2.write(0);
+      servo2.write(180);
     }
     vTaskDelay(pdMS_TO_TICKS(100));
   }
@@ -372,10 +362,17 @@ void setup()
   lcd.print("ESP32 with FreeRTOS");
   lcd.setCursor(0, 1);
   lcd.print("Parking lot project.");
+
+  SPI.begin();
+  rfidIn.PCD_Init();
+  rfidOut.PCD_Init();
+
   lcdClearTimer = xTimerCreate("lcdClearTimer", pdMS_TO_TICKS(5000), pdFALSE, NULL, clearLCD);
   // xTimerReset(lcdClearTimer, 0); dùng cái này để reset timer nhé
   servo1.attach(SERVO_1);
   servo2.attach(SERVO_2);
+  servo1.write(180);
+  servo2.write(180);
   // Task watchdog
   esp_task_wdt_init(WDT_TIMEOUT, true);
 
@@ -399,16 +396,10 @@ void setup()
   xTaskCreatePinnedToCore(RFIDOutTask, "RFIDOutTask", 4096, NULL, 3, NULL, 1);
   xTaskCreatePinnedToCore(ServoOutTask, "ServoOutTask", 4096, NULL, 2, NULL, 1);
 
-  // ISR
-  pinMode(BTN_IN, INPUT_PULLUP);
-  pinMode(BTN_OUT, INPUT_PULLUP);
   pinMode(IR_1, INPUT);
   pinMode(IR_2, INPUT);
   pinMode(IR_IN, INPUT);
   pinMode(IR_OUT, INPUT);
-
-  attachInterrupt(BTN_IN, ISR_BTN_IN, FALLING);
-  attachInterrupt(BTN_OUT, ISR_BTN_OUT, FALLING);
 }
 
 void loop() {}

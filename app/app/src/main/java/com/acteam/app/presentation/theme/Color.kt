@@ -1,4 +1,4 @@
-package com.acteam.app.ui.theme
+package com.acteam.app.presentation.theme
 
 import androidx.compose.ui.graphics.Color
 

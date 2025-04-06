@@ -1,4 +1,4 @@
-package com.acteam.app.ui.theme
+package com.acteam.app.presentation.theme
 
 import android.app.Activity
 import android.os.Build

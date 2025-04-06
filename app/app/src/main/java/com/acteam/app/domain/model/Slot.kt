@@ -1,4 +1,5 @@
-package com.acteam.app.data.model
+package com.acteam.app.domain.model
 
-class Slot {
-}
+import java.util.Date
+
+data class Slot (val _id: String, val number: Int, val isEmpty: Boolean, val createdAt: Date, val updatedAt: Date)
