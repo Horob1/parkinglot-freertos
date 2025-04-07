@@ -1,7 +1,10 @@
 import express from 'express';
 import * as cardController from '../controllers/card.controller';
+import auth from '../middlewares/auth';
 
 const router = express.Router();
+
+router.use(auth);
 
 // Create a new card
 router.post('/', cardController.createCard);
