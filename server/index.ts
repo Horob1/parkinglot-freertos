@@ -22,6 +22,9 @@ app.use(cors(corsOptions));
 theApp(app);
 db();
 routes(app);
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'fe', 'index.html'));
+});
 
 httpServer.listen(env.PORT, () => {
   console.log(`⚡️ [server]: Server is running at http://localhost:${env.PORT}`);
