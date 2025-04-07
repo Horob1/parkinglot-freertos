@@ -57,28 +57,30 @@ export const Home = () => {
         maxHeight: contentHeight,
       }}
     >
-      {slot.map((slot) => (
-        <Card
-          key={slot._id}
-          className={cn(
-            "flex-1 basic-1/2 justify-center items-center relative",
-            slot.isEmpty ? "bg-green-500" : "bg-red-500"
-          )}
-        >
-          <span
-            className="text-center text-[400px] text-background"
-            style={{ fontFamily: "Audiowide" }}
+      {slot
+        .sort((a, b) => a.number - b.number)
+        .map((slot) => (
+          <Card
+            key={slot._id}
+            className={cn(
+              "flex-1 basic-1/2 justify-center items-center relative",
+              slot.isEmpty ? "bg-green-500" : "bg-red-500"
+            )}
           >
-            {slot.number}
-          </span>
-          <span
-            className="absolute bottom-2 right-2 text-background text-sm"
-            style={{ fontFamily: "Audiowide" }}
-          >
-            Updated At {new Date(slot.updatedAt).toLocaleString()}
-          </span>
-        </Card>
-      ))}
+            <span
+              className="text-center text-[400px] text-background"
+              style={{ fontFamily: "Audiowide" }}
+            >
+              {slot.number}
+            </span>
+            <span
+              className="absolute bottom-2 right-2 text-background text-sm"
+              style={{ fontFamily: "Audiowide" }}
+            >
+              Updated At {new Date(slot.updatedAt).toLocaleString()}
+            </span>
+          </Card>
+        ))}
     </div>
   );
 };

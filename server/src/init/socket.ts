@@ -15,10 +15,9 @@ export const initSocket = (httpServer: Server) => {
     console.log(`⚡️ [WebSocket]: New client connected`);
 
     ws.on('message', async message => {
+      console.log(`[WebSocket]: Received message: ${message}`);
       try {
         const data = JSON.parse(message.toString());
-        console.log(`[WebSocket]: Received message: ${message}`);
-
         switch (data.type) {
           case 'auth':
             if (data.clientType === 'admin' || data.clientType === 'esp') {
@@ -29,8 +28,8 @@ export const initSocket = (httpServer: Server) => {
                 const slots = await SlotModel.find();
                 admin.send(JSON.stringify({ type: 'update-slots', slots: slots }));
               }
-            }
-            if (data.clientType === 'app') {
+            } else if (data.clientType === 'app') {
+              console.log(`✅ [WebSocket]: Registered as app`);
               appClients.add(ws);
             } else {
               console.log(`❌ [WebSocket]: Invalid client type`);

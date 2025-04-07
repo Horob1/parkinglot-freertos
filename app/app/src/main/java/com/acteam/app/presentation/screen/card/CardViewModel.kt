@@ -26,7 +26,9 @@ class CardViewModel(
     fun loadSlotList() {
         viewModelScope.launch {
             val slotList = cardRepository.loadSlotList()
-            _slotList.value = slotList
+            _slotList.value = slotList.sortedBy {
+                it.number
+            }
         }
     }
 
@@ -39,7 +41,7 @@ class CardViewModel(
     }
 
     fun updateSlots(newSlots: List<Slot>) {
-        _slotList.value = newSlots
+        _slotList.value = newSlots.sortedBy { it.number }
     }
 
     init {

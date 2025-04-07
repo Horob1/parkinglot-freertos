@@ -25,7 +25,6 @@ class SocketService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-
         // Tạo OkHttpClient với WebSocket
         okHttpClient = OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
@@ -33,7 +32,7 @@ class SocketService : Service() {
             .build()
 
         val request = Request.Builder()
-            .url("ws://10.0.2.2:3600")
+            .url("ws://192.168.1.12:3600/ws")
             .build()
 
         webSocket = okHttpClient.newWebSocket(request, object : WebSocketListener() {

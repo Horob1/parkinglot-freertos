@@ -23,7 +23,7 @@ Servo servo2;
 #define SERVO_2 27
 
 #define IR_1 35
-#define IR_2 34
+#define IR_2 12
 #define IR_IN 14
 #define IR_OUT 15
 
@@ -62,7 +62,7 @@ void clearLCD(TimerHandle_t xTimer)
   lcd.clear(); // Xóa màn hình LCD
 }
 
-const String WS_SERVER = "192.168.1.3";
+const String WS_SERVER = "192.168.1.12";
 const int WS_PORT = 3600;
 
 WiFiMulti WiFiMulti;
@@ -239,6 +239,21 @@ void WebSocketTask(void *pvParameters)
     vTaskDelay(pdMS_TO_TICKS(100)); // Chạy WebSocket 100ms/lần
   }
 }
+
+int readStableIR(int pin)
+{
+  int count = 0;
+  int value = digitalRead(pin);
+  for (int i = 0; i < 5; i++)
+  {
+    if (digitalRead(pin) == value)
+      count++;
+    delay(5);
+  }
+  if (count >= 4)
+    return value; // nếu 4/5 lần giống nhau thì coi là ổn định
+  return !value;  // nếu không thì coi là trạng thái còn lại
+}
 // Task update slot
 void UpdateSlotTask(void *pvParameters)
 {
@@ -249,8 +264,8 @@ void UpdateSlotTask(void *pvParameters)
   {
     esp_task_wdt_reset();
     int newTime = millis();
-    int newSlot_1 = digitalRead(IR_1);
-    int newSlot_2 = digitalRead(IR_2);
+    int newSlot_1 = readStableIR(IR_1);
+    int newSlot_2 = readStableIR(IR_2);
     if ((slot_1 != newSlot_1 || slot_2 != newSlot_2) && newTime - time > 1000)
     {
       time = newTime;
