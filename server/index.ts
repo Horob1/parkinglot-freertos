@@ -11,7 +11,7 @@ import path from 'path';
 dotenv.config();
 
 const app: Express = express();
-app.use(express.static(path.join(__dirname, '../client/dist')));
+app.use(express.static(path.join(__dirname, 'fe')));
 const httpServer = createServer(app);
 initSocket(httpServer);
 const corsOptions = {
