@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "main": "index.ts",
   "scripts": {
-    "start": "npx nodemon",
     "dev": "npx nodemon --exec ts-node index.ts",
     "lint": "eslint --ignore-path .gitignore --ext .ts src/",
     "lint:fix": "npm run lint -- --fix",
@@ -53,12 +52,6 @@
     "tsc-alias": "^1.8.1",
     "tsconfig-paths": "^4.1.1",
     "typescript": "^4.9.3"
-  },
-  "jest": {
-    "setupFiles": [
-      "./src/helpers/loadenv.ts"
-    ],
-    "testEnvironment": "node"
   },
   "license": "MIT"
 }
