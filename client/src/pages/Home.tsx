@@ -16,7 +16,9 @@ interface ISlot {
 }
 
 export const Home = () => {
-  const { socket, isConnected } = useWebSocketClient("ws://localhost:3600/ws");
+  const { socket, isConnected } = useWebSocketClient(
+    "wss://parkinglot-freertos.onrender.com/ws"
+  );
   useEffect(() => {
     if (socket && isConnected) {
       socket.onmessage = (event) => {
