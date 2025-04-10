@@ -32,7 +32,7 @@ class SocketService : Service() {
             .build()
 
         val request = Request.Builder()
-            .url("ws://parkinglot-freertos.onrender.com/ws")
+            .url("wss://parkinglot-freertos.onrender.com/ws")
             .build()
 
         webSocket = okHttpClient.newWebSocket(request, object : WebSocketListener() {
