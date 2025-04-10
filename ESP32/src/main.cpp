@@ -62,8 +62,8 @@ void clearLCD(TimerHandle_t xTimer)
   lcd.clear(); // Xóa màn hình LCD
 }
 
-const String WS_SERVER = "192.168.1.12";
-const int WS_PORT = 3600;
+const String WS_SERVER = "parkinglot-freertos.onrender.com";
+const int WS_PORT = 443;
 
 WiFiMulti WiFiMulti;
 WebSocketsClient webSocket;
@@ -214,7 +214,7 @@ void WebSocketTask(void *pvParameters)
     vTaskDelay(pdMS_TO_TICKS(500));
   }
 
-  webSocket.begin(WS_SERVER, WS_PORT, "/ws");
+  webSocket.beginSSL(WS_SERVER, WS_PORT, "/ws");
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(5000);
   esp_task_wdt_add(NULL);
@@ -230,7 +230,7 @@ void WebSocketTask(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(500));
       }
       Serial.println("[WebSocketTask] Reconnecting WebSocket...");
-      webSocket.begin(WS_SERVER, WS_PORT, "/ws");
+      webSocket.beginSSL(WS_SERVER, WS_PORT, "/ws");
       webSocket.onEvent(webSocketEvent);
       webSocket.setReconnectInterval(5000);
     }
