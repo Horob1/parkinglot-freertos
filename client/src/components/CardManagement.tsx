@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "react-hot-toast";
 import axiosInstance from "@/lib/axios";
 import { useLayout } from "@/hooks/use-layout";
+import { Skeleton } from "./ui/skeleton";
 
 interface Card {
   _id: string;
@@ -22,6 +23,7 @@ interface Card {
 }
 
 const CardManagement = () => {
+  const [isLoading, setIsLoading] = useState(false);
   const contentHieght = useLayout(); // Lấy contentHeight từ Context
   const [cards, setCards] = useState<Card[]>([]);
   const [uid, setUid] = useState("");
@@ -29,6 +31,7 @@ const CardManagement = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const fetchCards = async () => {
+    setIsLoading(true);
     try {
       const res = await axiosInstance.get("/card");
       console.log(res.data);
@@ -37,6 +40,7 @@ const CardManagement = () => {
       toast.error("Cannot load card list");
       console.error(error);
     }
+    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -71,7 +75,9 @@ const CardManagement = () => {
     }
   };
 
-  return (
+  return isLoading ? (
+    <Skeleton className="w-full h-full rounded-2xl"></Skeleton>
+  ) : (
     <div
       className="p-6 space-y-4 overflow-y-auto"
       style={{ maxHeight: contentHieght, height: contentHieght }}

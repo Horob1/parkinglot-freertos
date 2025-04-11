@@ -10,7 +10,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { Link, useLocation } from "react-router-dom";
-import { Home, IdCard, Logs } from "lucide-react";
+import { Home, IdCard, Logs, Settings, UserRoundCheck } from "lucide-react";
 import clsx from "clsx";
 
 // This is sample data.
@@ -37,6 +37,16 @@ const items = [
     name: "Log",
     url: "/log",
     icon: Logs,
+  },
+  {
+    name: "Client",
+    url: "/client",
+    icon: UserRoundCheck,
+  },
+  {
+    name: "Setting",
+    url: "/setting",
+    icon: Settings,
   },
 ];
 

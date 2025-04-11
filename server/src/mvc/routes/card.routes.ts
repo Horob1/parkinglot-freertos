@@ -9,6 +9,8 @@ router.use(auth);
 // Create a new card
 router.post('/', cardController.createCard);
 
+router.get('/unused', cardController.getUnusedCards);
+
 // Get all cards
 router.get('/', cardController.getAllCards);
 

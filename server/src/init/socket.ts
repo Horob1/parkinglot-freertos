@@ -3,6 +3,8 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { SlotModel } from '../mvc/models/slot.model';
 import { CardModel } from '../mvc/models/card.model';
 import { LogModel } from '../mvc/models/log.model';
+import { ConfigModel } from '../mvc/models/config.model';
+import { TaskStatsModel } from '../mvc/models/taskStats.model';
 
 export let wss: WebSocketServer;
 const clients = new Map<string, WebSocket>();
@@ -45,15 +47,25 @@ export const initSocket = (httpServer: Server) => {
                 ws.send(JSON.stringify({ type: 'error', message: 'Card not found' }));
                 return;
               }
+              const client = await CardModel.findOne({ cardId: card._id });
+              if (!client) {
+                console.log(`❌ [WebSocket]: Client not found`);
+                ws.send(JSON.stringify({ type: 'error', message: 'Client not found' }));
+                return;
+              }
               const isExist = await LogModel.findOne({ cardId: card._id, isCheckout: false });
               if (isExist) {
                 console.log(`❌ [WebSocket]: Card already checked in`);
                 ws.send(JSON.stringify({ type: 'error', message: 'Card already checked in' }));
                 return;
               }
-              const log = new LogModel({ cardId: card._id, isCheckout: false });
+              const log = new LogModel({ cardId: card._id, clientId: client._id, isCheckout: false });
               await log.save();
               console.log(`✅ [WebSocket]: Checked in card ${card.uid}`);
+              const admin = clients.get('admin');
+              if (admin) {
+                admin.send(JSON.stringify({ type: 'update-logs-in', log: log }));
+              }
               ws.send(JSON.stringify({ type: 'check-in-success', message: 'Checked in successfully' }));
             }
 
@@ -74,12 +86,20 @@ export const initSocket = (httpServer: Server) => {
                 return;
               }
               isExist.isCheckout = true;
-              // Tính tiền nếu dưới 1 giờ thì 10000 vnđ/giờ
-              // Tính tiền nếu trên 1 giờ thì 20000 vnđ/giờ
-              const bill = Math.ceil((Date.now() - isExist.createdAt.getTime()) / 3600000) * 10000;
+              const config = await ConfigModel.findOne({ name: 'billPerHour' });
+              if (!config) {
+                console.log(`❌ [WebSocket]: Config not found`);
+                ws.send(JSON.stringify({ type: 'error', message: 'Config not found' }));
+                return;
+              }
+              const bill = Math.ceil((Date.now() - isExist.createdAt.getTime()) / 3600000) * Number(config.value);
               isExist.bill = bill;
               await isExist.save();
               console.log(`✅ [WebSocket]: Checked out card ${card.uid}`);
+              const admin = clients.get('admin');
+              if (admin) {
+                admin.send(JSON.stringify({ type: 'update-logs-out', log: isExist }));
+              }
               ws.send(JSON.stringify({ type: 'check-out-success', message: 'Checked out successfully', bill: bill.toString() }));
             }
 
@@ -99,6 +119,31 @@ export const initSocket = (httpServer: Server) => {
             appClients.forEach(client => {
               client.send(JSON.stringify({ type: 'update-slots', slots: slots }));
             });
+            break;
+          case 'task-stats':
+            try {
+              const { avg_rfid_in, avg_rfid_out, avg_servo_in, avg_servo_out, avg_wifi, avg_ws, avg_slot } = data;
+
+              const stats = new TaskStatsModel({
+                avg_rfid_in,
+                avg_rfid_out,
+                avg_servo_in,
+                avg_servo_out,
+                avg_wifi,
+                avg_ws,
+                avg_slot,
+              });
+
+              await stats.save();
+              console.log('✅ [WebSocket]: Task stats saved');
+
+              const admin = clients.get('admin');
+              if (admin) {
+                admin.send(JSON.stringify({ type: 'update-task-stats', stats }));
+              }
+            } catch (error) {
+              console.error('❌ [WebSocket]: Failed to save task stats', error);
+            }
             break;
           default:
             console.log(`❌ [WebSocket]: Unknown message type`);

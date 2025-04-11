@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { CardModel } from '../models/card.model';
 import { LogModel } from '../models/log.model';
+import { ClientModel } from '../models/client.model';
 
 // Create a new card
 export const createCard = async (req: Request, res: Response): Promise<void> => {
@@ -91,13 +92,14 @@ export const updateCard = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    const isCardUsed = await LogModel.findOne({ cardId: id });
-    if (isCardUsed) {
+    const isCardUsed = await LogModel.findOne({ cardId: id, isCheckout: false });
+    const isCardUsed2 = await ClientModel.findOne({ cardId: id });
+    if (isCardUsed || isCardUsed2) {
       res.status(409).json({ message: 'Card is used in a parking log' });
       return;
     }
 
-    const updatedCard = await CardModel.findByIdAndUpdate(id, { uid }, { new: true, runValidators: true });
+    const updatedCard = await CardModel.findByIdAndUpdate(id, { uid }, { new: true });
 
     if (!updatedCard) {
       res.status(404).json({ message: 'Card not found' });
@@ -118,8 +120,9 @@ export const deleteCard = async (req: Request, res: Response): Promise<void> => 
   try {
     const { id } = req.params;
 
-    const isCardUsed = await LogModel.findOne({ cardId: id });
-    if (isCardUsed) {
+    const isCardUsed = await LogModel.findOne({ cardId: id, isCheckout: false });
+    const isCardUsed2 = await ClientModel.findOne({ cardId: id });
+    if (isCardUsed || isCardUsed2) {
       res.status(409).json({ message: 'Card is used in a parking log' });
       return;
     }
@@ -139,6 +142,21 @@ export const deleteCard = async (req: Request, res: Response): Promise<void> => 
   } catch (error) {
     res.status(500).json({
       message: 'Error deleting card',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+};
+
+export const getUnusedCards = async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const user = await ClientModel.find();
+    const userCard = user.map(user => user.cardId).filter(cardId => cardId !== null);
+    const unusedCards = await CardModel.find({ _id: { $nin: userCard } });
+
+    res.status(200).json(unusedCards);
+  } catch (error) {
+    res.status(500).json({
+      message: 'Error fetching unused cards',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }

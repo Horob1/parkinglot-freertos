@@ -16,6 +16,17 @@
 #include <SPI.h>
 #define WDT_TIMEOUT 10 // Thời gian tối đa (giây) trước khi WDT reset ESP32
 
+// TaskHandle_t
+TaskHandle_t WiFiTaskHandle;
+TaskHandle_t WebSocketTaskHandle;
+TaskHandle_t UpdateSlotTaskHandle;
+TaskHandle_t RFIDInTaskHandle;
+TaskHandle_t ServoInTaskHandle;
+TaskHandle_t RFIDOutTaskHandle;
+TaskHandle_t ServoOutTaskHandle;
+TaskHandle_t ProfilerTaskHandle;
+TaskHandle_t SendStatsTaskHandle;
+
 Servo servo1;
 Servo servo2;
 
@@ -172,6 +183,7 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
 }
 
 // Task để kết nối WiFi
+unsigned long loopCountWiFi = 0, totalTimeWiFi = 0;
 void WiFiTask(void *pvParameters)
 {
   Serial.println("[WiFiTask] Connecting to WiFi...");
@@ -189,6 +201,8 @@ void WiFiTask(void *pvParameters)
   esp_task_wdt_add(NULL);
   while (true)
   {
+    unsigned long start = millis();
+
     if (WiFi.status() != WL_CONNECTED)
     {
       Serial.println("[WiFiTask] WiFi Disconnected! Reconnecting...");
@@ -201,12 +215,17 @@ void WiFiTask(void *pvParameters)
       }
     }
 
+    unsigned long duration = millis() - start;
+    totalTimeWiFi += duration;
+    loopCountWiFi++;
+
     esp_task_wdt_reset();
     vTaskDelay(pdMS_TO_TICKS(5000));
   }
 }
 
 // Task để quản lý WebSocket
+unsigned long loopCountWS = 0, totalTimeWS = 0;
 void WebSocketTask(void *pvParameters)
 {
   while (WiFi.status() != WL_CONNECTED)
@@ -217,10 +236,14 @@ void WebSocketTask(void *pvParameters)
   webSocket.beginSSL(WS_SERVER, WS_PORT, "/ws");
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(5000);
+
   esp_task_wdt_add(NULL);
   while (true)
   {
+    unsigned long start = millis();
+
     webSocket.loop();
+
     if (WiFi.status() != WL_CONNECTED)
     {
       Serial.println("[WebSocketTask] WiFi lost! Stopping WebSocket...");
@@ -235,8 +258,68 @@ void WebSocketTask(void *pvParameters)
       webSocket.setReconnectInterval(5000);
     }
 
+    unsigned long duration = millis() - start;
+    totalTimeWS += duration;
+    loopCountWS++;
+
     esp_task_wdt_reset();
-    vTaskDelay(pdMS_TO_TICKS(100)); // Chạy WebSocket 100ms/lần
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
+}
+
+void TaskProfiler(void *pvParameters)
+{
+  esp_task_wdt_add(NULL);
+  while (true)
+  {
+    esp_task_wdt_reset();
+    Serial.println("========== [TASK PROFILER] ==========");
+
+    // In thông tin CPU sử dụng và Stack còn lại
+    TaskHandle_t taskHandles[] = {
+        xTaskGetHandle("WiFiTask"),
+        xTaskGetHandle("WebSocketTask"),
+        xTaskGetHandle("UpdateSlotTask"),
+        xTaskGetHandle("RFIDInTask"),
+        xTaskGetHandle("ServoInTask"),
+        xTaskGetHandle("RFIDOutTask"),
+        xTaskGetHandle("ServoOutTask")};
+
+    const char *taskNames[] = {
+        "WiFiTask",
+        "WebSocketTask",
+        "UpdateSlotTask",
+        "RFIDInTask",
+        "ServoInTask",
+        "RFIDOutTask",
+        "ServoOutTask"};
+
+    for (int i = 0; i < sizeof(taskHandles) / sizeof(taskHandles[0]); i++)
+    {
+      if (taskHandles[i] != NULL)
+      {
+        UBaseType_t stackHighWaterMark = uxTaskGetStackHighWaterMark(taskHandles[i]);
+        Serial.printf("Task: %-15s | Min Stack Left: %5u bytes\n", taskNames[i], stackHighWaterMark * sizeof(StackType_t));
+      }
+      else
+      {
+        Serial.printf("Task: %-15s | Not running\n", taskNames[i]);
+      }
+    }
+
+    uint32_t totalHeap = ESP.getHeapSize();
+    uint32_t freeHeap = ESP.getFreeHeap();
+    uint32_t usedHeap = totalHeap - freeHeap;
+    uint32_t minFreeHeap = ESP.getMinFreeHeap();
+
+    Serial.println("------------ [MEMORY] ------------");
+    Serial.printf("Total Heap:       %u bytes\n", totalHeap);
+    Serial.printf("Free Heap:        %u bytes\n", freeHeap);
+    Serial.printf("Used Heap:        %u bytes\n", usedHeap);
+    Serial.printf("Min Free Ever:    %u bytes\n", minFreeHeap);
+    Serial.println("==================================\n");
+
+    vTaskDelay(pdMS_TO_TICKS(5000)); // Mỗi 5 giây log 1 lần
   }
 }
 
@@ -244,88 +327,147 @@ int readStableIR(int pin)
 {
   int count = 0;
   int value = digitalRead(pin);
-  for (int i = 0; i < 5; i++)
+  for (int i = 0; i < 50 && count < 40; i++)
   {
     if (digitalRead(pin) == value)
       count++;
-    delay(5);
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
-  if (count >= 4)
-    return value; // nếu 4/5 lần giống nhau thì coi là ổn định
-  return !value;  // nếu không thì coi là trạng thái còn lại
+  if (count >= 40)
+    return value;
+  return !value;
 }
 // Task update slot
+unsigned long loopCountSlot = 0, totalTimeSlot = 0;
 void UpdateSlotTask(void *pvParameters)
 {
   esp_task_wdt_add(NULL);
   int time = 0;
+  char payload[64];
   int slot_1 = 0, slot_2 = 0;
+  int newSlot_1 = readStableIR(IR_1);
+  int newSlot_2 = readStableIR(IR_2);
+
   while (true)
   {
+    unsigned long start = millis(); // Bắt đầu đo thời gian
+
     esp_task_wdt_reset();
     int newTime = millis();
-    int newSlot_1 = readStableIR(IR_1);
-    int newSlot_2 = readStableIR(IR_2);
+    newSlot_1 = readStableIR(IR_1);
+    newSlot_2 = readStableIR(IR_2);
+
     if ((slot_1 != newSlot_1 || slot_2 != newSlot_2) && newTime - time > 1000)
     {
       time = newTime;
       slot_1 = newSlot_1;
       slot_2 = newSlot_2;
-      webSocket.sendTXT("{\"type\": \"update-slot\", \"slot_1\": " + String(slot_1) + ", \"slot_2\": " + String(slot_2) + "}");
+
+      snprintf(payload, sizeof(payload),
+               "{\"type\":\"update-slot\",\"slot_1\":%d,\"slot_2\":%d}",
+               slot_1, slot_2);
+      webSocket.sendTXT(payload);
     }
+
+    unsigned long duration = millis() - start;
+    totalTimeSlot += duration;
+    loopCountSlot++;
+
     vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
-// Task để quản lý RFID
+
+// Biến cục bộ quản lý task
+unsigned long loopCountIn = 0, totalTimeIn = 0;
+unsigned long loopCountOut = 0, totalTimeOut = 0;
+unsigned long loopCountServoIn = 0, totalTimeServoIn = 0;
+unsigned long loopCountServoOut = 0, totalTimeServoOut = 0;
+// Hàm dùng chung gửi WebSocket UID
+void sendUIDEvent(const char *type, MFRC522 &reader, char *uid, char *payload)
+{
+  for (byte i = 0; i < reader.uid.size; i++)
+  {
+    sprintf(&uid[i * 2], "%02X", reader.uid.uidByte[i]);
+  }
+  snprintf(payload, 64, "{\"type\":\"%s\",\"uid\":\"%s\"}", type, uid);
+  webSocket.sendTXT(payload);
+}
+
+// Task quản lý RFID IN
 void RFIDInTask(void *pvParameters)
 {
   esp_task_wdt_add(NULL);
-  String uid = "";
+  char uid[32] = {0};
+  char payload[64];
+
   while (true)
   {
+    unsigned long start = millis();
+
     esp_task_wdt_reset();
     if (rfidIn.PICC_IsNewCardPresent() && rfidIn.PICC_ReadCardSerial() && digitalRead(IR_IN) == LOW)
     {
-      uid = "";
+      uid[0] = '\0';
       for (byte i = 0; i < rfidIn.uid.size; i++)
       {
-        uid += String(rfidIn.uid.uidByte[i], HEX);
+        sprintf(uid + strlen(uid), "%02X", rfidIn.uid.uidByte[i]);
       }
-      uid.toUpperCase();
-      webSocket.sendTXT("{\"type\": \"check-in\", \"uid\": \"" + uid + "\"}");
-      rfidIn.PICC_HaltA(); // Dừng giao tiếp với thẻ
+      snprintf(payload, sizeof(payload), "{\"type\":\"check-in\",\"uid\":\"%s\"}", uid);
+      webSocket.sendTXT(payload);
+      rfidIn.PICC_HaltA();
       buzz();
     }
+
+    unsigned long duration = millis() - start;
+    totalTimeIn += duration;
+    loopCountIn++;
+
     vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
+
+// Task quản lý RFID OUT
 void RFIDOutTask(void *pvParameters)
 {
   esp_task_wdt_add(NULL);
-  String uid = "";
+  char uid[32] = {0};
+  char payload[64];
+
   while (true)
   {
+    unsigned long start = millis();
+
     esp_task_wdt_reset();
     if (rfidOut.PICC_IsNewCardPresent() && rfidOut.PICC_ReadCardSerial() && digitalRead(IR_OUT) == LOW)
     {
-      uid = "";
+      uid[0] = '\0';
       for (byte i = 0; i < rfidOut.uid.size; i++)
       {
-        uid += String(rfidOut.uid.uidByte[i], HEX);
+        sprintf(uid + strlen(uid), "%02X", rfidOut.uid.uidByte[i]);
       }
-      uid.toUpperCase();
-      webSocket.sendTXT("{\"type\": \"check-out\", \"uid\": \"" + uid + "\"}");
-      rfidOut.PICC_HaltA(); // Dừng giao tiếp với thẻ
+      snprintf(payload, sizeof(payload), "{\"type\":\"check-out\",\"uid\":\"%s\"}", uid);
+      webSocket.sendTXT(payload);
+      rfidOut.PICC_HaltA();
       buzz();
     }
+
+    unsigned long duration = millis() - start;
+    totalTimeOut += duration;
+    loopCountOut++;
+
     vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
+
+// Task điều khiển servo vào
 void ServoInTask(void *pvParameters)
 {
   esp_task_wdt_add(NULL);
+
   while (true)
   {
+    unsigned long start = millis();
+
     esp_task_wdt_reset();
     if (xSemaphoreTake(bs_in, pdMS_TO_TICKS(2000)) == pdTRUE && digitalRead(IR_IN) == LOW)
     {
@@ -336,18 +478,26 @@ void ServoInTask(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(100));
       }
       vTaskDelay(pdMS_TO_TICKS(1000));
-
       servo1.write(180);
     }
+
+    unsigned long duration = millis() - start;
+    totalTimeServoIn += duration;
+    loopCountServoIn++;
+
     vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
 
+// Task điều khiển servo ra
 void ServoOutTask(void *pvParameters)
 {
   esp_task_wdt_add(NULL);
+
   while (true)
   {
+    unsigned long start = millis();
+
     esp_task_wdt_reset();
     if (xSemaphoreTake(bs_out, pdMS_TO_TICKS(2000)) == pdTRUE && digitalRead(IR_OUT) == LOW)
     {
@@ -360,7 +510,59 @@ void ServoOutTask(void *pvParameters)
       vTaskDelay(pdMS_TO_TICKS(1000));
       servo2.write(180);
     }
+
+    unsigned long duration = millis() - start;
+    totalTimeServoOut += duration;
+    loopCountServoOut++;
+
     vTaskDelay(pdMS_TO_TICKS(100));
+  }
+}
+
+void SendStatsTask(void *pvParameters)
+{
+  esp_task_wdt_add(NULL);
+  char statsPayload[256];
+
+  while (true)
+  {
+    esp_task_wdt_reset();
+
+    // Tính thời gian trung bình
+    float avgIn = loopCountIn ? (float)totalTimeIn / loopCountIn : 0;
+    float avgOut = loopCountOut ? (float)totalTimeOut / loopCountOut : 0;
+    float avgServoIn = loopCountServoIn ? (float)totalTimeServoIn / loopCountServoIn : 0;
+    float avgServoOut = loopCountServoOut ? (float)totalTimeServoOut / loopCountServoOut : 0;
+    float avgWiFi = loopCountWiFi ? (float)totalTimeWiFi / loopCountWiFi : 0;
+    float avgWS = loopCountWS ? (float)totalTimeWS / loopCountWS : 0;
+    float avgSlot = loopCountSlot ? (float)totalTimeSlot / loopCountSlot : 0;
+
+    // Tạo JSON payload
+    snprintf(statsPayload, sizeof(statsPayload),
+             "{\"type\":\"task-stats\","
+             "\"avg_rfid_in\":%.2f,"
+             "\"avg_rfid_out\":%.2f,"
+             "\"avg_servo_in\":%.2f,"
+             "\"avg_servo_out\":%.2f,"
+             "\"avg_wifi\":%.2f,"
+             "\"avg_ws\":%.2f,"
+             "\"avg_slot\":%.2f}",
+             avgIn, avgOut, avgServoIn, avgServoOut, avgWiFi, avgWS, avgSlot);
+
+    // Gửi qua WebSocket
+    webSocket.sendTXT(statsPayload);
+
+    // Reset biến để đo tiếp vòng sau
+    loopCountIn = loopCountOut = loopCountServoIn = loopCountServoOut = 0;
+    loopCountWiFi = loopCountWS = loopCountSlot = 0;
+
+    totalTimeIn = totalTimeOut = totalTimeServoIn = totalTimeServoOut = 0;
+    totalTimeWiFi = totalTimeWS = totalTimeSlot = 0;
+
+    Serial.println("[SendStatsTask] Sent stats to WebSocket");
+
+    // Gửi mỗi 10 giây
+    vTaskDelay(pdMS_TO_TICKS(10000));
   }
 }
 
@@ -401,15 +603,17 @@ void setup()
   }
 
   // Core 0
-  xTaskCreatePinnedToCore(WiFiTask, "WiFiTask", 4096, NULL, 1, NULL, 0);
-  xTaskCreatePinnedToCore(WebSocketTask, "WebSocketTask", 8192, NULL, 3, NULL, 0);
-  xTaskCreatePinnedToCore(UpdateSlotTask, "UpdateSlotTask", 4096, NULL, 2, NULL, 0);
-  xTaskCreatePinnedToCore(RFIDInTask, "RFIDInTask", 4096, NULL, 3, NULL, 0);
-  xTaskCreatePinnedToCore(ServoInTask, "ServoInTask", 4096, NULL, 2, NULL, 0);
+  xTaskCreatePinnedToCore(WiFiTask, "WiFiTask", 4096, NULL, 1, &WiFiTaskHandle, 0);
+  xTaskCreatePinnedToCore(WebSocketTask, "WebSocketTask", 8192, NULL, 3, &WebSocketTaskHandle, 0);
+  xTaskCreatePinnedToCore(UpdateSlotTask, "UpdateSlotTask", 4096, NULL, 2, &UpdateSlotTaskHandle, 0);
+  xTaskCreatePinnedToCore(RFIDInTask, "RFIDInTask", 4096, NULL, 3, &RFIDInTaskHandle, 0);
+  xTaskCreatePinnedToCore(ServoInTask, "ServoInTask", 4096, NULL, 2, &ServoInTaskHandle, 0);
 
   // Core 1
-  xTaskCreatePinnedToCore(RFIDOutTask, "RFIDOutTask", 4096, NULL, 3, NULL, 1);
-  xTaskCreatePinnedToCore(ServoOutTask, "ServoOutTask", 4096, NULL, 2, NULL, 1);
+  xTaskCreatePinnedToCore(RFIDOutTask, "RFIDOutTask", 4096, NULL, 3, &RFIDOutTaskHandle, 1);
+  xTaskCreatePinnedToCore(ServoOutTask, "ServoOutTask", 4096, NULL, 2, &ServoOutTaskHandle, 1);
+  xTaskCreatePinnedToCore(TaskProfiler, "ProfilerTask", 4096, NULL, 1, &ProfilerTaskHandle, 1);
+  xTaskCreatePinnedToCore(SendStatsTask, "SendStatsTask", 4096, NULL, 1, &SendStatsTaskHandle, 1);
 
   pinMode(IR_1, INPUT);
   pinMode(IR_2, INPUT);

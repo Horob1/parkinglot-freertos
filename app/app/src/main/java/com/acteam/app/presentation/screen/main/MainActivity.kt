@@ -56,6 +56,7 @@ class MainActivity : ComponentActivity() {
         val intent = Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_MUTABLE)
         nfcAdapter.enableForegroundDispatch(this, pendingIntent, null, null)
+
     }
 
     override fun onPause() {
