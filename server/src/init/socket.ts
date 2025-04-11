@@ -5,6 +5,7 @@ import { CardModel } from '../mvc/models/card.model';
 import { LogModel } from '../mvc/models/log.model';
 import { ConfigModel } from '../mvc/models/config.model';
 import { TaskStatsModel } from '../mvc/models/taskStats.model';
+import { ClientModel } from '../mvc/models/client.model';
 
 export let wss: WebSocketServer;
 const clients = new Map<string, WebSocket>();
@@ -47,7 +48,7 @@ export const initSocket = (httpServer: Server) => {
                 ws.send(JSON.stringify({ type: 'error', message: 'Card not found' }));
                 return;
               }
-              const client = await CardModel.findOne({ cardId: card._id });
+              const client = await ClientModel.findOne({ cardId: card._id });
               if (!client) {
                 console.log(`❌ [WebSocket]: Client not found`);
                 ws.send(JSON.stringify({ type: 'error', message: 'Client not found' }));
@@ -61,12 +62,20 @@ export const initSocket = (httpServer: Server) => {
               }
               const log = new LogModel({ cardId: card._id, clientId: client._id, isCheckout: false });
               await log.save();
+              ws.send(JSON.stringify({ type: 'check-in-success', message: 'Checked in successfully' }));
+              const logGiveToClient = await LogModel.findOne({ cardId: card._id, isCheckout: false }).populate('clientId cardId');
+              const billPerHour = await ConfigModel.findOne({ name: 'billPerHour' });
+              if (!billPerHour) {
+                console.log(`❌ [WebSocket]: Bill per hour config not found`);
+                ws.send(JSON.stringify({ type: 'error', message: 'Bill per hour config not found' }));
+                return;
+              }
+              logGiveToClient.bill = Math.ceil((Date.now() - logGiveToClient.createdAt.getTime()) / 3600000) * Number(billPerHour.value);
               console.log(`✅ [WebSocket]: Checked in card ${card.uid}`);
               const admin = clients.get('admin');
               if (admin) {
-                admin.send(JSON.stringify({ type: 'update-logs-in', log: log }));
+                admin.send(JSON.stringify({ type: 'update-logs-in', log: logGiveToClient }));
               }
-              ws.send(JSON.stringify({ type: 'check-in-success', message: 'Checked in successfully' }));
             }
 
             break;
@@ -79,7 +88,7 @@ export const initSocket = (httpServer: Server) => {
                 ws.send(JSON.stringify({ type: 'error', message: 'Card not found' }));
                 return;
               }
-              const isExist = await LogModel.findOne({ cardId: card._id, isCheckout: false });
+              const isExist = await LogModel.findOne({ cardId: card._id, isCheckout: false }).populate('clientId cardId');
               if (!isExist) {
                 console.log(`❌ [WebSocket]: Card not checked in`);
                 ws.send(JSON.stringify({ type: 'error', message: 'Card not checked in' }));

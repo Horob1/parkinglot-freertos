@@ -155,6 +155,7 @@ export const Home = () => {
       try {
         const response = await axiosInstance.get("/log/unchecked");
         setUncheckedLog(response.data.logs);
+        console.log(response.data.logs);
       } catch (error) {
         toast.error(
           (error as { message: string })?.message || "Fetch log failed"
@@ -293,9 +294,9 @@ export const Home = () => {
       {uncheckedLog.length === 0 && (
         <Card className="w-full p-6 flex flex-col items-center gap-4 shadow-md">
           <img
-            src="/path-to-your-image/A_flat,_minimalist_digital_illustration_depicts_an.png"
+            src="/ANH.jpg"
             alt="Empty Parking Lot"
-            className="w-[300px] h-auto object-contain"
+            className="w-[300px] h-auto object-contain rounded-full mb-4"
           />
           <h1 className="text-2xl md:text-3xl font-bold text-green-500 text-center">
             Empty Parking Lot

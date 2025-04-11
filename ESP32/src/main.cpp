@@ -73,8 +73,8 @@ void clearLCD(TimerHandle_t xTimer)
   lcd.clear(); // Xóa màn hình LCD
 }
 
-const String WS_SERVER = "parkinglot-freertos.onrender.com";
-const int WS_PORT = 443;
+const String WS_SERVER = "192.168.1.36";
+const int WS_PORT = 3600;
 
 WiFiMulti WiFiMulti;
 WebSocketsClient webSocket;
@@ -189,6 +189,7 @@ void WiFiTask(void *pvParameters)
   Serial.println("[WiFiTask] Connecting to WiFi...");
   WiFiMulti.addAP("HOROB1", "mancityvodich");
   WiFiMulti.addAP("Tam Nguyen", "mancityvodich");
+  WiFiMulti.addAP("Duy 84", "123456789");
 
   while (WiFiMulti.run() != WL_CONNECTED)
   {
@@ -233,7 +234,7 @@ void WebSocketTask(void *pvParameters)
     vTaskDelay(pdMS_TO_TICKS(500));
   }
 
-  webSocket.beginSSL(WS_SERVER, WS_PORT, "/ws");
+  webSocket.begin(WS_SERVER, WS_PORT, "/ws");
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(5000);
 
@@ -327,13 +328,13 @@ int readStableIR(int pin)
 {
   int count = 0;
   int value = digitalRead(pin);
-  for (int i = 0; i < 50 && count < 40; i++)
+  for (int i = 0; i < 10 && count < 8; i++)
   {
     if (digitalRead(pin) == value)
       count++;
     vTaskDelay(pdMS_TO_TICKS(10));
   }
-  if (count >= 40)
+  if (count >= 8)
     return value;
   return !value;
 }
@@ -469,7 +470,7 @@ void ServoInTask(void *pvParameters)
     unsigned long start = millis();
 
     esp_task_wdt_reset();
-    if (xSemaphoreTake(bs_in, pdMS_TO_TICKS(2000)) == pdTRUE && digitalRead(IR_IN) == LOW)
+    if (xSemaphoreTake(bs_in, pdMS_TO_TICKS(100)) == pdTRUE && digitalRead(IR_IN) == LOW)
     {
       servo1.write(90);
       while (digitalRead(IR_IN) == LOW)
@@ -477,7 +478,7 @@ void ServoInTask(void *pvParameters)
         esp_task_wdt_reset();
         vTaskDelay(pdMS_TO_TICKS(100));
       }
-      vTaskDelay(pdMS_TO_TICKS(1000));
+      vTaskDelay(pdMS_TO_TICKS(100));
       servo1.write(180);
     }
 
@@ -499,7 +500,7 @@ void ServoOutTask(void *pvParameters)
     unsigned long start = millis();
 
     esp_task_wdt_reset();
-    if (xSemaphoreTake(bs_out, pdMS_TO_TICKS(2000)) == pdTRUE && digitalRead(IR_OUT) == LOW)
+    if (xSemaphoreTake(bs_out, pdMS_TO_TICKS(100)) == pdTRUE && digitalRead(IR_OUT) == LOW)
     {
       servo2.write(90);
       while (digitalRead(IR_OUT) == LOW)
@@ -507,7 +508,7 @@ void ServoOutTask(void *pvParameters)
         esp_task_wdt_reset();
         vTaskDelay(pdMS_TO_TICKS(100));
       }
-      vTaskDelay(pdMS_TO_TICKS(1000));
+      vTaskDelay(pdMS_TO_TICKS(100));
       servo2.write(180);
     }
 
@@ -527,42 +528,43 @@ void SendStatsTask(void *pvParameters)
   while (true)
   {
     esp_task_wdt_reset();
+    if(webSocket.isConnected())
+    {
+      // Tính thời gian trung bình
+      float avgIn = loopCountIn ? (float)totalTimeIn / loopCountIn : 0;
+      float avgOut = loopCountOut ? (float)totalTimeOut / loopCountOut : 0;
+      float avgServoIn = loopCountServoIn ? (float)totalTimeServoIn / loopCountServoIn : 0;
+      float avgServoOut = loopCountServoOut ? (float)totalTimeServoOut / loopCountServoOut : 0;
+      float avgWiFi = loopCountWiFi ? (float)totalTimeWiFi / loopCountWiFi : 0;
+      float avgWS = loopCountWS ? (float)totalTimeWS / loopCountWS : 0;
+      float avgSlot = loopCountSlot ? (float)totalTimeSlot / loopCountSlot : 0;
 
-    // Tính thời gian trung bình
-    float avgIn = loopCountIn ? (float)totalTimeIn / loopCountIn : 0;
-    float avgOut = loopCountOut ? (float)totalTimeOut / loopCountOut : 0;
-    float avgServoIn = loopCountServoIn ? (float)totalTimeServoIn / loopCountServoIn : 0;
-    float avgServoOut = loopCountServoOut ? (float)totalTimeServoOut / loopCountServoOut : 0;
-    float avgWiFi = loopCountWiFi ? (float)totalTimeWiFi / loopCountWiFi : 0;
-    float avgWS = loopCountWS ? (float)totalTimeWS / loopCountWS : 0;
-    float avgSlot = loopCountSlot ? (float)totalTimeSlot / loopCountSlot : 0;
+      // Tạo JSON payload
+      snprintf(statsPayload, sizeof(statsPayload),
+               "{\"type\":\"task-stats\","
+               "\"avg_rfid_in\":%.2f,"
+               "\"avg_rfid_out\":%.2f,"
+               "\"avg_servo_in\":%.2f,"
+               "\"avg_servo_out\":%.2f,"
+               "\"avg_wifi\":%.2f,"
+               "\"avg_ws\":%.2f,"
+               "\"avg_slot\":%.2f}",
+               avgIn, avgOut, avgServoIn, avgServoOut, avgWiFi, avgWS, avgSlot);
 
-    // Tạo JSON payload
-    snprintf(statsPayload, sizeof(statsPayload),
-             "{\"type\":\"task-stats\","
-             "\"avg_rfid_in\":%.2f,"
-             "\"avg_rfid_out\":%.2f,"
-             "\"avg_servo_in\":%.2f,"
-             "\"avg_servo_out\":%.2f,"
-             "\"avg_wifi\":%.2f,"
-             "\"avg_ws\":%.2f,"
-             "\"avg_slot\":%.2f}",
-             avgIn, avgOut, avgServoIn, avgServoOut, avgWiFi, avgWS, avgSlot);
+      // Gửi qua WebSocket
+      webSocket.sendTXT(statsPayload);
 
-    // Gửi qua WebSocket
-    webSocket.sendTXT(statsPayload);
+      // Reset biến để đo tiếp vòng sau
+      loopCountIn = loopCountOut = loopCountServoIn = loopCountServoOut = 0;
+      loopCountWiFi = loopCountWS = loopCountSlot = 0;
 
-    // Reset biến để đo tiếp vòng sau
-    loopCountIn = loopCountOut = loopCountServoIn = loopCountServoOut = 0;
-    loopCountWiFi = loopCountWS = loopCountSlot = 0;
+      totalTimeIn = totalTimeOut = totalTimeServoIn = totalTimeServoOut = 0;
+      totalTimeWiFi = totalTimeWS = totalTimeSlot = 0;
 
-    totalTimeIn = totalTimeOut = totalTimeServoIn = totalTimeServoOut = 0;
-    totalTimeWiFi = totalTimeWS = totalTimeSlot = 0;
-
-    Serial.println("[SendStatsTask] Sent stats to WebSocket");
-
-    // Gửi mỗi 10 giây
-    vTaskDelay(pdMS_TO_TICKS(10000));
+      Serial.println("[SendStatsTask] Sent stats to WebSocket");
+    }
+    // Gửi mỗi 5 giây
+    vTaskDelay(pdMS_TO_TICKS(5000));
   }
 }
 
