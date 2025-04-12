@@ -5,7 +5,6 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Bundle
 import android.os.IBinder
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -311,7 +310,7 @@ fun FrontCardContent(uid: String, log: Log?, totalBill: Int) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
-                            .data("http://192.168.1.12:3600${log?.clientId?.avatar}")
+                            .data("https://parkinglot-freertos.onrender.com${log?.clientId?.avatar}")
                             .crossfade(true)
                             .build(),
                         contentDescription = "Avatar",
@@ -347,7 +346,7 @@ fun BackCardContent(log: Log?) {
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data("http://192.168.1.12:3600${log?.clientId?.carDescription?.image}")
+                    .data("https://parkinglot-freertos.onrender.com${log?.clientId?.carDescription?.image}")
                     .crossfade(true)
                     .build(),
                 contentDescription = "car",
