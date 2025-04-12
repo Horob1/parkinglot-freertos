@@ -1,7 +1,6 @@
 package com.acteam.app.presentation.screen.card
 
 import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Bundle
@@ -10,40 +9,68 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.acteam.app.R
 import com.acteam.app.data.remote.network.RetrofitClient
 import com.acteam.app.data.remote.socket.SocketService
+import com.acteam.app.domain.model.HistoryLog
 import com.acteam.app.domain.model.Log
 import com.acteam.app.domain.model.Slot
 import com.acteam.app.domain.repository.CardRepositoryImpl
@@ -51,7 +78,6 @@ import com.acteam.app.presentation.theme.AppTheme
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.math.ceil
 
 class CardInfoActivity : ComponentActivity() {
     private var socketService: SocketService? = null
@@ -83,7 +109,7 @@ class CardInfoActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val uid = intent.getStringExtra("card_uid") ?: "No UID Found"
         val intent = Intent(this, SocketService::class.java)
-        bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+        bindService(intent, serviceConnection, BIND_AUTO_CREATE)
 
         viewModel = ViewModelProvider(
             this,
@@ -92,14 +118,6 @@ class CardInfoActivity : ComponentActivity() {
                 uid
             )
         )[CardViewModel::class.java]
-
-        viewModel.isCannotGetLog.observe(this) { isCannotGetLog ->
-
-            if(isCannotGetLog) {
-                Toast.makeText(this, "Card invalid!", Toast.LENGTH_SHORT).show()
-                finish()
-            }
-        }
         enableEdgeToEdge()
         setContent {
             AppTheme {
@@ -119,136 +137,248 @@ class CardInfoActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CardInfoScreen(uid: String, modifier: Modifier = Modifier, viewModel: CardViewModel) {
-    // Collecting data from the viewModel
-    val slotList = viewModel.slotList.collectAsState()
-    val log = viewModel.log.collectAsState()
+fun CardInfoScreen(
+    uid: String,
+    modifier: Modifier = Modifier,
+    viewModel: CardViewModel
+) {
+    val isLoading by viewModel.isLoading.collectAsState()
+    val logHistory by viewModel.history.collectAsState()
+    val slotList by viewModel.slotList.collectAsState()
+    val log by viewModel.log.collectAsState()
+    val isCannotGetLog by viewModel.isCannotGetLog.collectAsState()
+    var showHistory by remember { mutableStateOf(false) }
 
-    Column(
+  if(!isLoading) LazyColumn(
         modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .padding(horizontal = 16.dp)
+            .fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // LazyColumn to display slots
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            item {
-                BankCardUI(uid = uid, log = log.value)
-            }
-            items(slotList.value.size) { index ->
-                SlotItem(slot = slotList.value[index])
-            }
+      if(!isCannotGetLog)
+        item {
+            BankCardUI(
+                uid = uid, log = log, totalBill = logHistory.sumOf(
+                { it.bill ?: 0 }
+            ))
+        }
+
+      item {
+          Button(
+              onClick = { showHistory = !showHistory },
+              modifier = Modifier.fillMaxWidth()
+          ) {
+              Text(if (showHistory) "Hide History" else "Show History")
+          }
+      }
+
+      item {
+          AnimatedVisibility(
+              visible = showHistory,
+              enter = expandVertically() + fadeIn(),
+              exit = shrinkVertically() + fadeOut()
+          ) {
+              Column(
+                  verticalArrangement = Arrangement.spacedBy(8.dp)
+              ) {
+                  logHistory.forEach { log ->
+                      HistoryItem(log = log)
+                  }
+              }
+          }
+      }
+
+        items(slotList.size) { index ->
+            SlotItem(slot = slotList[index])
         }
     }
 }
 
-fun calculateBill(createdAt: Date): Int {
-    val now = Date()
-    val diffMillis = now.time - createdAt.time
-
-    // Chuyển millis → giờ (double), rồi làm tròn lên
-    val hours = ceil(diffMillis / (1000.0 * 60 * 60))
-
-    // Nhân với 10,000
-    return (hours * 10_000).toInt()
+@Composable
+fun HistoryItem(log: HistoryLog) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "⏱️ Check-In: ${formatDate(log?.createdAt)}",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "⏱️ Check-Out: ${formatDate(log?.updatedAt)}",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "💰 Bill: ${log?.bill} VND",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
 }
 
-fun formatDate(date: Date): String {
+fun formatDate(date: Date?): String {
     val formatter = SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault())
-    return formatter.format(date)
+    return formatter.format(date ?: Date())
 }
 
 @Composable
-fun BankCardUI(uid: String, log: Log, modifier: Modifier = Modifier) {
-    Card(
+fun BankCardUI(
+    uid: String,
+    log: Log?,
+    totalBill: Int,
+    modifier: Modifier = Modifier
+) {
+    var flipped by remember { mutableStateOf(false) }
+
+    val rotation by animateFloatAsState(
+        targetValue = if (flipped) 180f else 0f,
+        animationSpec = tween(durationMillis = 600),
+        label = "flipRotation"
+    )
+
+    val isFront = rotation <= 90f
+
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(8.dp),
-        shape = RoundedCornerShape(16.dp),
-
+            .padding(top = 12.dp)
+            .height(200.dp)
+            .graphicsLayer {
+                rotationY = rotation
+                cameraDistance = 12 * density
+            }
+            .clickable { flipped = !flipped }
     ) {
-        // Add a gradient background for the bank card look
+        if (isFront) {
+            FrontCardContent(uid = uid, log = log, totalBill = totalBill)
+        } else {
+            BackCardContent(log = log) // <-- Bạn sẽ định nghĩa nội dung mặt sau ở đây
+        }
+    }
+}
+
+@Composable
+fun FrontCardContent(uid: String, log: Log?, totalBill: Int) {
+    Card(
+        modifier = Modifier.fillMaxSize(),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
         Box(
             modifier = Modifier
-                .background(Brush.horizontalGradient(listOf(
-                    MaterialTheme.colorScheme.primary,
-                    MaterialTheme.colorScheme.secondary
-                ))) // Green to blue gradient
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primaryContainer,
+                            MaterialTheme.colorScheme.primary
+                        )
+                    )
+                )
+                .padding(24.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Card UID",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
-                    ),
-                    modifier = Modifier.align(Alignment.Start)
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = uid,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 24.sp
-                    ),
-                )
-                Spacer(modifier = Modifier.height(16.dp))
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("CARD UID", style = MaterialTheme.typography.labelLarge.copy(color = Color.White))
+                    Text(
+                        text = uid,
+                        style = MaterialTheme.typography.headlineSmall.copy(color = Color.White, fontWeight = FontWeight.Bold)
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text("Check-In ⏳: ${formatDate(log?.createdAt)}", style = MaterialTheme.typography.bodyMedium.copy(color = Color.White))
+                    Spacer(Modifier.height(8.dp))
+                    Text("Bill 💰: ${log?.bill} VND (Estimate)", style = MaterialTheme.typography.bodyMedium.copy(color = Color.White))
+                    Spacer(Modifier.height(8.dp))
+                    Text("Total Bill 💰: $totalBill VND", style = MaterialTheme.typography.bodyMedium.copy(color = Color.White))
+                }
 
-                Text(
-                    text = "Check-In ⏳: ${formatDate(log.createdAt)}",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = Color.White,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 18.sp
-                    ),
-                    modifier = Modifier.align(Alignment.Start)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Bill 💰: ${calculateBill(
-                        log.createdAt
-                    )} VND",
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = Color.White,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 18.sp
-                ),
-                    modifier = Modifier.align(Alignment.Start)
-                )
+                Spacer(Modifier.width(16.dp))
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data("http://192.168.1.12:3600${log?.clientId?.avatar}")
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "Avatar",
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .border(2.dp, Color.White, CircleShape),
+                        contentScale = ContentScale.Crop,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = log?.clientId?.name.orEmpty(),
+                        style = MaterialTheme.typography.labelLarge.copy(color = Color.White),
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }
 }
+
+@Composable
+fun BackCardContent(log: Log?) {
+    Card(
+        modifier = Modifier.fillMaxSize(),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondary)
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data("http://192.168.1.12:3600${log?.clientId?.carDescription?.image}")
+                    .crossfade(true)
+                    .build(),
+                contentDescription = "car",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(id = R.drawable.lambo), // ảnh tạm thời khi loading (nếu có)
+                error = painterResource(id = R.drawable.lambo), // ảnh khi load lỗi (nếu có)
+                fallback = painterResource(id = R.drawable.lambo)
+            )
+        }
+    }
+}
+
+
 
 @Composable
 fun SlotItem(slot: Slot) {
     val color by animateColorAsState(
-        targetValue = if (slot.isEmpty) Color(0xFF4CAF50) else Color(0xFFF44336), // xanh / đỏ
-        label = ""
+        targetValue = if (slot.isEmpty) Color(0xFF4CAF50) else Color(0xFFF44336),
+        label = "slotColorAnimation"
     )
 
     val formattedTime = remember(slot.updatedAt) {
         SimpleDateFormat("d/M/yyyy, hh:mm:ss a", Locale.getDefault()).format(slot.updatedAt)
     }
 
-    Card(
+    ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(8.dp)
             .aspectRatio(1f), // Hình vuông
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = color)
     ) {
         Box(
@@ -256,21 +386,21 @@ fun SlotItem(slot: Slot) {
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
-            // Slot number in the center
             Text(
                 text = slot.number.toString(),
-                style = MaterialTheme.typography.displayLarge.copy(
+                style = MaterialTheme.typography.displayMedium.copy(
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
+                    fontSize = 180.sp
                 ),
                 modifier = Modifier.align(Alignment.Center)
             )
-
-            // Time at bottom-end
             Text(
-                text = "Updated At $formattedTime",
-                style = MaterialTheme.typography.labelSmall.copy(color = Color.White),
+                text = "Updated: $formattedTime",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp),
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = 4.dp, bottom = 4.dp)

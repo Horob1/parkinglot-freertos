@@ -85,13 +85,24 @@ export const checkLog = async (req: Request, res: Response) => {
     }
 
     const card = await CardModel.findOne({ uid });
+
     if (!card) {
       return res.status(404).json({ message: 'Card not found' });
     }
 
-    const log = await LogModel.findOne({ cardId: card._id, isCheckout: false });
+    const [log, billPerHour] = await Promise.all([
+      LogModel.findOne({ cardId: card._id, isCheckout: false }).populate('clientId cardId'),
+      ConfigModel.findOne({ name: 'billPerHour' }),
+    ]);
 
-    res.status(200).json(log);
+    if (log) {
+      log.bill = Math.ceil((Date.now() - log.createdAt.getTime()) / 3600000) * Number(billPerHour.value);
+    }
+
+    res.status(200).json({
+      message: 'Logs retrieved and analyzed successfully',
+      log,
+    });
   } catch (error) {
     res.status(500).json({
       message: 'Error during login',

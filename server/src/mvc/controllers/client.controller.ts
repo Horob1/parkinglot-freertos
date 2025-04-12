@@ -136,13 +136,14 @@ export const deleteClient = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    // update unchecked log
-    await Promise.all([
-      LogModel.findOneAndUpdate({ clientId: id, isCheckout: false }, { isCheckout: true, bill: 0 }, { new: true }),
-      ClientModel.findByIdAndDelete(id),
-    ]);
+    const log = await LogModel.findOne({ clientId: id, isCheckout: false });
+    if (log) {
+      res.status(409).json({ message: 'Client is used in a parking log' });
+      return;
+    }
 
-    res.status(200).json({ message: 'Client deleted successfully' });
+    // update unchecked log
+    await ClientModel.findByIdAndDelete(id), res.status(200).json({ message: 'Client deleted successfully' });
   } catch (error) {
     res.status(500).json({
       message: 'Error deleting client',
