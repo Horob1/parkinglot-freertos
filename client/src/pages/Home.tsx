@@ -88,7 +88,9 @@ export const Home = () => {
   // );
   const [isLoading, setIsLoading] = useState(false);
   const contentHeight = useLayout();
-  const { socket, isConnected } = useWebSocketClient("ws://localhost:3600/ws");
+  const { socket, isConnected } = useWebSocketClient(
+    "ws://parkinglot-freertos.onrender.com/ws"
+  );
   useEffect(() => {
     if (socket && isConnected) {
       socket.onmessage = (event) => {
