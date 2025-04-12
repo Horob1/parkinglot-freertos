@@ -89,7 +89,7 @@ export const Home = () => {
   const [isLoading, setIsLoading] = useState(false);
   const contentHeight = useLayout();
   const { socket, isConnected } = useWebSocketClient(
-    "ws://parkinglot-freertos.onrender.com/ws"
+    "wss://parkinglot-freertos.onrender.com/ws"
   );
   useEffect(() => {
     if (socket && isConnected) {
