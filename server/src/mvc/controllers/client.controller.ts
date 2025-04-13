@@ -76,7 +76,7 @@ export const updateClient = async (req: Request, res: Response): Promise<void> =
     const { id } = req.params;
     const { cccd, avatar, name, phone, email, address, carDescription, cardId } = req.body;
 
-    if (cardId) {
+    if (cardId !== '') {
       const isExist = await ClientModel.findOne({ cardId });
       if (isExist) {
         res.status(409).json({ message: 'Card is used in a parking log' });
@@ -109,7 +109,7 @@ export const updateClient = async (req: Request, res: Response): Promise<void> =
     updatedClient.carDescription.licensePlate = carDescription?.licensePlate ?? updatedClient.carDescription.licensePlate;
     updatedClient.carDescription.model = carDescription?.model ?? updatedClient.carDescription.model;
     updatedClient.carDescription.image = carDescription?.image ?? updatedClient.carDescription.image;
-    updatedClient.cardId = cardId ?? updatedClient.cardId;
+    updatedClient.cardId = cardId !== '' ? cardId : updatedClient.cardId;
     const savedClient = await updatedClient.save();
 
     res.status(200).json(savedClient);
