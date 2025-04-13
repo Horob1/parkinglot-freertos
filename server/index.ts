@@ -12,7 +12,7 @@ import fs from 'fs';
 dotenv.config();
 
 const app: Express = express();
-// app.use(express.static(path.join(__dirname, 'fe')));
+app.use(express.static(path.join(__dirname, 'fe')));
 //check upload folder exist
 if (!fs.existsSync(path.join(__dirname, 'uploads'))) {
   fs.mkdirSync(path.join(__dirname, 'uploads'));
@@ -28,9 +28,9 @@ app.use(cors(corsOptions));
 theApp(app);
 db();
 routes(app);
-// app.get('*', (req, res) => {
-//   res.sendFile(path.join(__dirname, 'fe', 'index.html'));
-// });
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'fe', 'index.html'));
+});
 
 httpServer.listen(env.PORT, () => {
   console.log(`⚡️ [server]: Server is running at http://localhost:${env.PORT}`);

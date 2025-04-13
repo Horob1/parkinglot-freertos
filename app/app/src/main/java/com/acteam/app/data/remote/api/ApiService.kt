@@ -1,5 +1,7 @@
 package com.acteam.app.data.remote.api
 
+import com.acteam.app.domain.model.CheckClientRequest
+import com.acteam.app.domain.model.CheckClientResponse
 import com.acteam.app.domain.model.CheckLogRequest
 import com.acteam.app.domain.model.CheckLogResponse
 import com.acteam.app.domain.model.HistoryResponse
@@ -19,4 +21,7 @@ interface ApiService {
 
     @GET("/api/log/history/{uid}")
     suspend fun getAllLogs(@Path("uid") uid: String): HistoryResponse
+
+    @POST("/api/client/check")
+    suspend fun checkClient(@Body request: CheckClientRequest) : CheckClientResponse
 }

@@ -91,7 +91,7 @@ export const checkLog = async (req: Request, res: Response) => {
     }
 
     const [log, billPerHour] = await Promise.all([
-      LogModel.findOne({ cardId: card._id, isCheckout: false }).populate('clientId cardId'),
+      LogModel.findOne({ cardId: card._id, isCheckout: false }),
       ConfigModel.findOne({ name: 'billPerHour' }),
     ]);
 
