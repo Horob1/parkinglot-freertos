@@ -161,7 +161,7 @@ export const Client = () => {
                     email: client.email,
                     address: client.address,
                     carDescription: client.carDescription,
-                    cardId: client.cardId?._id,
+                    cardId: "",
                   }}
                   onSubmit={async (data) => {
                     try {

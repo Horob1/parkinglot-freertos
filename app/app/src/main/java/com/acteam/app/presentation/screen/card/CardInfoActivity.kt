@@ -191,6 +191,10 @@ fun CardInfoScreen(
                         })
                 }
 
+                if (log != null) item {
+                    HistoryItem(log = log!!)
+                }
+                
                 if (logHistory.isNotEmpty()) {
                     item {
                         Button(

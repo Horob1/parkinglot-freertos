@@ -167,7 +167,7 @@ export const checkClient = async (req: Request, res: Response) => {
 
     res.status(200).json({
       message: 'User retrieved successfully',
-      user,
+      client: user,
     });
   } catch (error) {
     res.status(500).json({
