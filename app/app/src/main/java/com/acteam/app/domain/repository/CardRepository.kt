@@ -1,6 +1,6 @@
 package com.acteam.app.domain.repository
 
-import com.acteam.app.domain.model.HistoryLog
+import com.acteam.app.domain.model.Client
 import com.acteam.app.domain.model.Log
 import com.acteam.app.domain.model.Slot
 
@@ -9,5 +9,7 @@ interface CardRepository {
 
     suspend fun checkLog(uid: String): Log?
 
-    suspend fun loadHistory(uid: String): List<HistoryLog>
+    suspend fun loadHistory(uid: String): List<Log>
+
+    suspend fun checkClient(uid: String): Client?
 }

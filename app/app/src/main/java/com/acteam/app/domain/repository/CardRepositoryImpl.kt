@@ -1,11 +1,9 @@
 package com.acteam.app.domain.repository
 
 import com.acteam.app.data.remote.api.ApiService
-import com.acteam.app.domain.model.CarDescription
-import com.acteam.app.domain.model.Card
+import com.acteam.app.domain.model.CheckClientRequest
 import com.acteam.app.domain.model.CheckLogRequest
 import com.acteam.app.domain.model.Client
-import com.acteam.app.domain.model.HistoryLog
 import com.acteam.app.domain.model.Log
 import com.acteam.app.domain.model.Slot
 import java.util.Date
@@ -30,7 +28,7 @@ class CardRepositoryImpl(private  val apiService: ApiService) : CardRepository  
         }
     }
 
-    override suspend fun loadHistory(uid: String): List<HistoryLog> {
+    override suspend fun loadHistory(uid: String): List<Log> {
         try {
             val res = apiService.getAllLogs(uid)
             return res.logs.filter { it.bill != null }
@@ -40,4 +38,13 @@ class CardRepositoryImpl(private  val apiService: ApiService) : CardRepository  
         }
     }
 
+    override suspend fun checkClient(uid: String): Client? {
+        try {
+            val res = apiService.checkClient(CheckClientRequest(uid))
+            return res.client
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return null
+        }
+    }
 }

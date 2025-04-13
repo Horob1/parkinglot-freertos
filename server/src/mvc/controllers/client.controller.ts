@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { ClientModel } from '../models/client.model';
 import { LogModel } from '../models/log.model';
+import { CardModel } from '../models/card.model';
 
 export const getAllClients = async (_req: Request, res: Response): Promise<void> => {
   try {
@@ -74,14 +75,6 @@ export const updateClient = async (req: Request, res: Response): Promise<void> =
   try {
     const { id } = req.params;
     const { cccd, avatar, name, phone, email, address, carDescription, cardId } = req.body;
-    if (!cccd || !name || !phone || !email || !address || !carDescription) {
-      res.status(400).json({ message: 'Missing required fields' });
-      return;
-    }
-    if (!carDescription.licensePlate || !carDescription.color || !carDescription.brand || !carDescription.model) {
-      res.status(400).json({ message: 'Missing required fields' });
-      return;
-    }
 
     if (cardId) {
       const isExist = await ClientModel.findOne({ cardId });
@@ -111,11 +104,11 @@ export const updateClient = async (req: Request, res: Response): Promise<void> =
     updatedClient.phone = phone ?? updatedClient.phone;
     updatedClient.email = email ?? updatedClient.email;
     updatedClient.address = address ?? updatedClient.address;
-    updatedClient.carDescription.brand = carDescription.brand ?? updatedClient.carDescription.brand;
-    updatedClient.carDescription.color = carDescription.color ?? updatedClient.carDescription.color;
-    updatedClient.carDescription.licensePlate = carDescription.licensePlate ?? updatedClient.carDescription.licensePlate;
-    updatedClient.carDescription.model = carDescription.model ?? updatedClient.carDescription.model;
-    updatedClient.carDescription.image = carDescription.image ?? updatedClient.carDescription.image;
+    updatedClient.carDescription.brand = carDescription?.brand ?? updatedClient.carDescription.brand;
+    updatedClient.carDescription.color = carDescription?.color ?? updatedClient.carDescription.color;
+    updatedClient.carDescription.licensePlate = carDescription?.licensePlate ?? updatedClient.carDescription.licensePlate;
+    updatedClient.carDescription.model = carDescription?.model ?? updatedClient.carDescription.model;
+    updatedClient.carDescription.image = carDescription?.image ?? updatedClient.carDescription.image;
     updatedClient.cardId = cardId ?? updatedClient.cardId;
     const savedClient = await updatedClient.save();
 
@@ -147,6 +140,38 @@ export const deleteClient = async (req: Request, res: Response): Promise<void> =
   } catch (error) {
     res.status(500).json({
       message: 'Error deleting client',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+};
+
+export const checkClient = async (req: Request, res: Response) => {
+  try {
+    const { uid } = req.body;
+
+    if (!uid) {
+      return res.status(400).json({ message: 'Missing required parameters' });
+    }
+
+    const card = await CardModel.findOne({ uid });
+
+    if (!card) {
+      return res.status(404).json({ message: 'Card not found' });
+    }
+
+    const user = await ClientModel.findOne({ cardId: card._id });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json({
+      message: 'User retrieved successfully',
+      user,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Error during login',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
   }

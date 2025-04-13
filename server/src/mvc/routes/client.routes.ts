@@ -12,6 +12,8 @@ router.get('/:id', clientController.getClientById);
 
 router.post('/', clientController.createClient);
 
+router.post('/check', clientController.checkClient);
+
 router.put('/:id', clientController.updateClient);
 
 router.delete('/:id', clientController.deleteClient);

@@ -40,6 +40,7 @@ android {
 }
 
 dependencies {
+    implementation(libs.androidx.material)
     implementation(libs.coil.compose)
     implementation(libs.gson)
     implementation(libs.lottie.compose)
