@@ -4,6 +4,8 @@ import auth from '../middlewares/auth';
 
 const router = express.Router();
 
+router.post('/check', clientController.checkClient);
+
 router.use(auth);
 
 router.get('/', clientController.getAllClients);
@@ -11,8 +13,6 @@ router.get('/', clientController.getAllClients);
 router.get('/:id', clientController.getClientById);
 
 router.post('/', clientController.createClient);
-
-router.post('/check', clientController.checkClient);
 
 router.put('/:id', clientController.updateClient);
 

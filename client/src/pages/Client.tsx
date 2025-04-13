@@ -40,6 +40,7 @@ interface IClient {
   };
   cardId: {
     uid: string;
+    _id: string;
   };
 }
 export const Client = () => {
@@ -160,7 +161,7 @@ export const Client = () => {
                     email: client.email,
                     address: client.address,
                     carDescription: client.carDescription,
-                    cardId: client.cardId?.uid,
+                    cardId: client.cardId?._id,
                   }}
                   onSubmit={async (data) => {
                     try {
